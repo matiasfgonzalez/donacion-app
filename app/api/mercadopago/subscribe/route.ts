@@ -24,33 +24,32 @@ export async function POST() {
 
     const email = user.emailAddresses[0]?.emailAddress;
 
-    const response = await fetch('https://api.mercadopago.com/preapproval', {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${process.env.MERCADOPAGO_ACCESS_TOKEN}`,
-        'Content-Type': 'application/json',
+    // Fetch the plan to get its init_point (checkout URL hosted by MercadoPago)
+    const planResponse = await fetch(
+      `https://api.mercadopago.com/preapproval_plan/${process.env.MP_PLAN_ID}`,
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.MERCADOPAGO_ACCESS_TOKEN}`,
+        },
       },
-      body: JSON.stringify({
-        preapproval_plan_id: process.env.MP_PLAN_ID,
-        payer_email: email,
-        back_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard/billing`,
-        reason: 'Donación mensual - DonaApp',
-        external_reference: userId,
-        status: 'pending',
-      }),
-    });
+    );
 
-    const data = await response.json();
+    const plan = await planResponse.json();
 
-    if (!data.init_point) {
-      console.error('MP Error:', data);
+    if (!plan.init_point) {
+      console.error('[MP_PLAN_ERROR]', plan);
       return NextResponse.json(
-        { error: 'Error al crear suscripción' },
+        { error: 'Error al obtener el plan de suscripción' },
         { status: 500 },
       );
     }
 
-    return NextResponse.json({ url: data.init_point });
+    // Build the checkout URL with payer email and external reference
+    const checkoutUrl = new URL(plan.init_point);
+    if (email) checkoutUrl.searchParams.set('payer_email', email);
+    checkoutUrl.searchParams.set('external_reference', userId);
+
+    return NextResponse.json({ url: checkoutUrl.toString() });
   } catch (error) {
     console.error('[SUBSCRIBE_ERROR]', error);
     return new NextResponse('Internal Error', { status: 500 });
