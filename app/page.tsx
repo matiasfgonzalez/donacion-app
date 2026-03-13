@@ -1,26 +1,48 @@
 import Link from 'next/link';
 import { auth } from '@clerk/nextjs/server';
-import { redirect } from 'next/navigation';
+import { UserButton } from '@clerk/nextjs';
 
-export default function LandingPage() {
+export default async function LandingPage() {
+  const { userId } = await auth();
+
   return (
     <main className="min-h-screen bg-gradient-to-br from-emerald-50 to-teal-100">
       {/* Navbar */}
       <nav className="flex items-center justify-between px-8 py-4 bg-white shadow-sm">
         <span className="text-2xl font-bold text-emerald-600">💚 DonaApp</span>
-        <div className="flex gap-4">
-          <Link
-            href="/sign-in"
-            className="px-4 py-2 text-emerald-600 border border-emerald-600 rounded-lg hover:bg-emerald-50 transition"
-          >
-            Iniciar sesión
-          </Link>
-          <Link
-            href="/sign-up"
-            className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition"
-          >
-            Registrarse
-          </Link>
+        <div className="flex items-center gap-4">
+          {userId ? (
+            <>
+              <Link
+                href="/dashboard"
+                className="px-4 py-2 text-emerald-600 border border-emerald-600 rounded-lg hover:bg-emerald-50 transition"
+              >
+                Dashboard
+              </Link>
+              <UserButton
+                appearance={{
+                  elements: {
+                    avatarBox: 'w-10 h-10',
+                  },
+                }}
+              />
+            </>
+          ) : (
+            <>
+              <Link
+                href="/sign-in"
+                className="px-4 py-2 text-emerald-600 border border-emerald-600 rounded-lg hover:bg-emerald-50 transition"
+              >
+                Iniciar sesión
+              </Link>
+              <Link
+                href="/sign-up"
+                className="px-4 py-2 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition"
+              >
+                Registrarse
+              </Link>
+            </>
+          )}
         </div>
       </nav>
 
@@ -34,10 +56,10 @@ export default function LandingPage() {
           pequeña contribución mensual podés generar un gran impacto.
         </p>
         <Link
-          href="/sign-up"
+          href={userId ? '/dashboard' : '/sign-up'}
           className="mt-4 px-8 py-4 bg-emerald-600 text-white text-lg font-semibold rounded-xl hover:bg-emerald-700 transition shadow-lg"
         >
-          Quiero donar →
+          {userId ? 'Ir al Dashboard →' : 'Quiero donar →'}
         </Link>
       </section>
 

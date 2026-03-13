@@ -6,13 +6,16 @@ export async function POST(req: Request) {
     const body = await req.json();
     const { type, data } = body;
 
-    console.log('[MP_WEBHOOK]', type, data);
+    console.log('[MP_WEBHOOK] Received:', JSON.stringify(body));
 
     if (type === 'subscription_preapproval') {
       const subscriptionId = data?.id;
-      if (!subscriptionId) return new NextResponse('No ID', { status: 400 });
+      if (!subscriptionId) {
+        console.error('[MP_WEBHOOK] No subscription ID in data');
+        return NextResponse.json({ received: true }, { status: 200 });
+      }
 
-      // Consultamos el estado actualizado a MP
+      // Fetch the subscription details from MercadoPago
       const response = await fetch(
         `https://api.mercadopago.com/preapproval/${subscriptionId}`,
         {
@@ -22,12 +25,20 @@ export async function POST(req: Request) {
         },
       );
 
+      if (!response.ok) {
+        // For test/simulated webhooks, MP sends fake IDs that don't exist
+        console.warn(
+          `[MP_WEBHOOK] Could not fetch preapproval ${subscriptionId}: ${response.status}`,
+        );
+        return NextResponse.json({ received: true }, { status: 200 });
+      }
+
       const mpData = await response.json();
       const userId = mpData.external_reference;
 
       if (!userId) {
-        console.error('[MP_WEBHOOK] No external_reference found');
-        return new NextResponse('No user reference', { status: 400 });
+        console.warn('[MP_WEBHOOK] No external_reference found, skipping');
+        return NextResponse.json({ received: true }, { status: 200 });
       }
 
       await prisma.userSubscription.upsert({
@@ -51,13 +62,13 @@ export async function POST(req: Request) {
       });
 
       console.log(
-        `[MP_WEBHOOK] Suscripción actualizada: userId=${userId}, status=${mpData.status}`,
+        `[MP_WEBHOOK] Subscription updated: userId=${userId}, status=${mpData.status}`,
       );
     }
 
-    return new NextResponse(null, { status: 200 });
+    return NextResponse.json({ received: true }, { status: 200 });
   } catch (error) {
     console.error('[MP_WEBHOOK_ERROR]', error);
-    return new NextResponse('Internal Error', { status: 500 });
+    return NextResponse.json({ received: true }, { status: 200 });
   }
 }
