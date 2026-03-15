@@ -1,7 +1,57 @@
+import { auth } from '@clerk/nextjs/server';
+import { prisma } from '@/lib/prisma';
 import { getUserSubscription } from '@/lib/subscription';
 import { SubscribeButton } from '@/components/subscribe-button';
 
-export default async function BillingPage() {
+export default async function BillingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ preapproval_id?: string }>;
+}) {
+  const { preapproval_id } = await searchParams;
+
+  // If MP redirected back with a preapproval_id, sync the subscription immediately
+  if (preapproval_id) {
+    const { userId } = await auth();
+    if (userId) {
+      try {
+        const mpRes = await fetch(
+          `https://api.mercadopago.com/preapproval/${preapproval_id}`,
+          {
+            headers: {
+              Authorization: `Bearer ${process.env.MERCADOPAGO_ACCESS_TOKEN}`,
+            },
+          },
+        );
+        if (mpRes.ok) {
+          const mpData = await mpRes.json();
+          await prisma.userSubscription.upsert({
+            where: { userId },
+            create: {
+              userId,
+              mercadopagoSubscriptionId: mpData.id,
+              mercadopagoPlanId: mpData.preapproval_plan_id,
+              status: mpData.status,
+              currentPeriodEnd: mpData.next_payment_date
+                ? new Date(mpData.next_payment_date)
+                : null,
+            },
+            update: {
+              mercadopagoSubscriptionId: mpData.id,
+              mercadopagoPlanId: mpData.preapproval_plan_id,
+              status: mpData.status,
+              currentPeriodEnd: mpData.next_payment_date
+                ? new Date(mpData.next_payment_date)
+                : null,
+            },
+          });
+        }
+      } catch (e) {
+        console.error('[BILLING_SYNC_ERROR]', e);
+      }
+    }
+  }
+
   const subscription = await getUserSubscription();
   const isActive = subscription?.status === 'authorized';
 

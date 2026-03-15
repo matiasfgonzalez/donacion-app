@@ -25,6 +25,12 @@ export default function DashboardLayout({
         >
           💳 Mi Suscripción
         </Link>
+        <Link
+          href="/dashboard/plan"
+          className="text-gray-700 hover:text-emerald-600 font-medium"
+        >
+          ⚙️ Plan MP
+        </Link>
         <div className="mt-auto flex items-center gap-2">
           <UserButton />
           <span className="text-sm text-gray-500">Mi cuenta</span>

@@ -24,7 +24,7 @@ export async function POST() {
 
     const email = user.emailAddresses[0]?.emailAddress;
 
-    // Fetch the plan to get its init_point (checkout URL hosted by MercadoPago)
+    // Fetch the plan's init_point (hosted checkout by MercadoPago)
     const planResponse = await fetch(
       `https://api.mercadopago.com/preapproval_plan/${process.env.MP_PLAN_ID}`,
       {
@@ -44,10 +44,15 @@ export async function POST() {
       );
     }
 
-    // Build the checkout URL with payer email and external reference
+    // Save a pending record in DB so the webhook can find userId by payer email
+    await prisma.userSubscription.upsert({
+      where: { userId },
+      create: { userId, payerEmail: email ?? null, status: 'pending' },
+      update: { payerEmail: email ?? null, status: 'pending' },
+    });
+
     const checkoutUrl = new URL(plan.init_point);
     if (email) checkoutUrl.searchParams.set('payer_email', email);
-    checkoutUrl.searchParams.set('external_reference', userId);
 
     return NextResponse.json({ url: checkoutUrl.toString() });
   } catch (error) {

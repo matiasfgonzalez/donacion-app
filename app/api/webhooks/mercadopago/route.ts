@@ -34,10 +34,20 @@ export async function POST(req: Request) {
       }
 
       const mpData = await response.json();
-      const userId = mpData.external_reference;
+      let userId = mpData.external_reference;
+
+      // Fallback: find userId by payer email saved at subscription initiation
+      if (!userId && mpData.payer_email) {
+        const record = await prisma.userSubscription.findFirst({
+          where: { payerEmail: mpData.payer_email },
+        });
+        userId = record?.userId ?? null;
+      }
 
       if (!userId) {
-        console.warn('[MP_WEBHOOK] No external_reference found, skipping');
+        console.warn(
+          '[MP_WEBHOOK] No external_reference or matching email, skipping',
+        );
         return NextResponse.json({ received: true }, { status: 200 });
       }
 
@@ -58,6 +68,7 @@ export async function POST(req: Request) {
           currentPeriodEnd: mpData.next_payment_date
             ? new Date(mpData.next_payment_date)
             : null,
+          payerEmail: mpData.payer_email ?? undefined,
         },
       });
 
